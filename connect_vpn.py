@@ -213,6 +213,33 @@ def connect_vpn(gateway, port=443, username=None):
                 if "connected" in line.lower() or "tunnel is up" in line.lower():
                     print_flush("")
                     print_flush("✅ VPN conectada!")
+                    print_flush("")
+                    print_flush("💡 Mantendo conexão ativa...")
+                    print_flush("💡 Pressione Ctrl+C para desconectar")
+                    print_flush("")
+                    
+                    # Manter processo rodando e monitorar
+                    connected = True
+                    try:
+                        # Continuar lendo logs para monitorar desconexões
+                        for line in iter(process.stdout.readline, ''):
+                            if line:
+                                line_stripped = line.rstrip()
+                                print_flush(f"   {line_stripped}")
+                                
+                                # Verificar se desconectou
+                                if "disconnected" in line.lower() or "connection closed" in line.lower():
+                                    print_flush("")
+                                    print_flush("⚠️  VPN desconectada!")
+                                    return False
+                    except KeyboardInterrupt:
+                        print_flush("")
+                        print_flush("🛑 Desconectando VPN...")
+                        process.terminate()
+                        process.wait()
+                        print_flush("✅ VPN desconectada")
+                        return True
+                    
                     return True
                 
                 # Verificar erros de certificado e tentar extrair digest
@@ -243,11 +270,18 @@ def connect_vpn(gateway, port=443, username=None):
         
     except KeyboardInterrupt:
         print_flush("")
-        print_flush("🛑 Desconectando...")
-        process.terminate()
+        print_flush("🛑 Desconectando VPN...")
+        if 'process' in locals():
+            process.terminate()
+            process.wait()
+        print_flush("✅ VPN desconectada")
         return True
     except Exception as e:
+        print_flush("")
         print_flush(f"❌ Erro: {e}")
+        if 'process' in locals():
+            process.terminate()
+            process.wait()
         return False
 
 

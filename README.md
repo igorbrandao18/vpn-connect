@@ -25,13 +25,16 @@ az login
 python3 connect_vpn.py --gateway dtc.sonepar.com.br
 ```
 
+**Importante:** O script precisa ficar rodando para manter a VPN conectada. Após conectar, o script continuará monitorando a conexão. Para desconectar, pressione `Ctrl+C`.
+
 ## Funcionalidades
 
 - ✅ Verifica autenticação Azure CLI automaticamente
 - ✅ Obtém token do Azure CLI
 - ✅ Abre navegador automaticamente para autenticação SAML
 - ✅ Conecta à VPN usando openfortivpn
-- ✅ Monitora status da conexão
+- ✅ Mantém conexão ativa e monitora status
+- ✅ Desconecta automaticamente ao pressionar Ctrl+C
 
 ## Opções
 
