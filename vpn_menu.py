@@ -279,6 +279,9 @@ def monitor_and_reconnect():
     check_interval = 5  # Verificar a cada 5 segundos
     reconnect_delay = 10  # Aguardar 10 segundos antes de reconectar
     
+    # Contador de linhas para controle de atualização
+    lines_written = 0
+    
     try:
         while True:
             current_time = datetime.now().strftime("%H:%M:%S")
@@ -375,33 +378,29 @@ def monitor_and_reconnect():
                         # Frame para animação (baseado no tempo)
                         animation_frame = int(time.time() * 10) % (terminal_width * 2)
                         
-                        # Limpar linhas anteriores e escrever na mesma posição
-                        sys.stdout.write('\r' + ' ' * terminal_width + '\r')
-                        sys.stdout.flush()
+                        # Se já escrevemos linhas antes, voltar para cima
+                        if lines_written > 0:
+                            sys.stdout.write(f'\033[{lines_written}A')  # Mover para cima
+                        sys.stdout.write('\033[K')  # Limpar linha atual
                         
                         # Status e interface
                         status_line = f"{Colors.BRIGHT_GREEN}[{current_time}] {spinner} VPN Conectada{Colors.RESET} | {Colors.CYAN}{interface}{Colors.RESET}"
                         sys.stdout.write(status_line + '\n')
-                        sys.stdout.flush()
                         
                         # Entrada com barra animada
                         rx_formatted = format_bytes(rx_bytes)
                         rx_label = f"{Colors.BRIGHT_BLUE}⬇️  Entrada:{Colors.RESET} {Colors.BRIGHT_GREEN}{rx_formatted:>12}{Colors.RESET} "
                         rx_bar = get_animated_bar(animation_frame, terminal_width - len(rx_label))
-                        sys.stdout.write(rx_label + rx_bar + '\r')
-                        sys.stdout.flush()
-                        
-                        # Aguardar um pouco para ver a animação
-                        time.sleep(0.1)
+                        sys.stdout.write(rx_label + rx_bar + '\n')
                         
                         # Saída com barra animada (offset diferente para não sincronizar)
                         tx_formatted = format_bytes(tx_bytes)
                         tx_label = f"{Colors.BRIGHT_MAGENTA}⬆️  Saída:{Colors.RESET}   {Colors.BRIGHT_GREEN}{tx_formatted:>12}{Colors.RESET} "
                         tx_bar = get_animated_bar(animation_frame + terminal_width, terminal_width - len(tx_label))
-                        sys.stdout.write('\r' + ' ' * terminal_width + '\r')
-                        sys.stdout.write(rx_label + rx_bar + '\n')
-                        sys.stdout.write(tx_label + tx_bar + '\r')
+                        sys.stdout.write(tx_label + tx_bar)
+                        
                         sys.stdout.flush()
+                        lines_written = 3  # Status + Entrada + Saída
                     else:
                         spinner = get_spinner_char(int(time.time() * 5) % 8, 0)
                         sys.stdout.write('\r' + ' ' * 70 + '\r')
