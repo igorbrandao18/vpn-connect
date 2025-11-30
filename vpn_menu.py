@@ -378,29 +378,153 @@ def monitor_and_reconnect():
                         # Frame para animação (baseado no tempo)
                         animation_frame = int(time.time() * 10) % (terminal_width * 2)
                         
-                        # Se já escrevemos linhas antes, voltar para cima
-                        if lines_written > 0:
-                            sys.stdout.write(f'\033[{lines_written}A')  # Mover para cima
-                        sys.stdout.write('\033[K')  # Limpar linha atual
+                        # Calcular velocidade (comparar com última leitura)
+                        if not hasattr(monitor_and_reconnect, 'last_rx_bytes'):
+                            monitor_and_reconnect.last_rx_bytes = rx_bytes
+                            monitor_and_reconnect.last_tx_bytes = tx_bytes
+                            monitor_and_reconnect.last_time = time.time()
+                            monitor_and_reconnect.connection_start_time = time.time()
                         
-                        # Status e interface
-                        status_line = f"{Colors.BRIGHT_GREEN}[{current_time}] {spinner} VPN Conectada{Colors.RESET} | {Colors.CYAN}{interface}{Colors.RESET}"
-                        sys.stdout.write(status_line + '\n')
+                        current_time_sec = time.time()
+                        time_diff = current_time_sec - monitor_and_reconnect.last_time
                         
-                        # Entrada com barra animada
-                        rx_formatted = format_bytes(rx_bytes)
-                        rx_label = f"{Colors.BRIGHT_BLUE}⬇️  Entrada:{Colors.RESET} {Colors.BRIGHT_GREEN}{rx_formatted:>12}{Colors.RESET} "
-                        rx_bar = get_animated_bar(animation_frame, terminal_width - len(rx_label))
-                        sys.stdout.write(rx_label + rx_bar + '\n')
+                        if time_diff > 0:
+                            rx_speed = (rx_bytes - monitor_and_reconnect.last_rx_bytes) / time_diff
+                            tx_speed = (tx_bytes - monitor_and_reconnect.last_tx_bytes) / time_diff
+                        else:
+                            rx_speed = 0
+                            tx_speed = 0
                         
-                        # Saída com barra animada (offset diferente para não sincronizar)
-                        tx_formatted = format_bytes(tx_bytes)
-                        tx_label = f"{Colors.BRIGHT_MAGENTA}⬆️  Saída:{Colors.RESET}   {Colors.BRIGHT_GREEN}{tx_formatted:>12}{Colors.RESET} "
-                        tx_bar = get_animated_bar(animation_frame + terminal_width, terminal_width - len(tx_label))
-                        sys.stdout.write(tx_label + tx_bar)
+                        monitor_and_reconnect.last_rx_bytes = rx_bytes
+                        monitor_and_reconnect.last_tx_bytes = tx_bytes
+                        monitor_and_reconnect.last_time = current_time_sec
                         
-                        sys.stdout.flush()
-                        lines_written = 3  # Status + Entrada + Saída
+                        def format_speed(bps):
+                            return format_bytes(bps) + "/s"
+                        
+                        # Obter IP da VPN
+                        try:
+                            result = subprocess.run(['ifconfig', interface], capture_output=True, text=True)
+                            ip_match = re.search(r'inet\s+(\d+\.\d+\.\d+\.\d+)', result.stdout)
+                            vpn_ip = ip_match.group(1) if ip_match else "N/A"
+                        except:
+                            vpn_ip = "N/A"
+                        
+                        # Obter MTU e outros dados do netstat
+                        try:
+                            result = subprocess.run(['netstat', '-ibn'], capture_output=True, text=True)
+                            for line in result.stdout.split('\n'):
+                                if re.match(rf'^{re.escape(interface)}\s+', line) and '<Link#' in line:
+                                    parts = re.split(r'\s+', line.strip())
+                                    mtu = parts[1] if len(parts) > 1 else "N/A"
+                                    ipkts = int(parts[4]) if len(parts) > 4 else 0
+                                    opkts = int(parts[6]) if len(parts) > 6 else 0
+                                    break
+                            else:
+                                mtu = "N/A"
+                                ipkts = 0
+                                opkts = 0
+                        except:
+                            mtu = "N/A"
+                            ipkts = 0
+                            opkts = 0
+                        
+                        # Calcular tempo de conexão
+                        uptime_seconds = int(current_time_sec - monitor_and_reconnect.connection_start_time)
+                        uptime_hours = uptime_seconds // 3600
+                        uptime_minutes = (uptime_seconds % 3600) // 60
+                        uptime_secs = uptime_seconds % 60
+                        
+                        # Calcular porcentagens e estatísticas
+                        total_bytes = rx_bytes + tx_bytes
+                        rx_percent = (rx_bytes / total_bytes * 100) if total_bytes > 0 else 0
+                        tx_percent = (tx_bytes / total_bytes * 100) if total_bytes > 0 else 0
+                        avg_speed = (rx_speed + tx_speed) / 2 if (rx_speed + tx_speed) > 0 else 0
+                        
+                        # Barra melhorada que combina animação com valor real
+                        def get_enhanced_bar(frame, width, value=0, max_value=1000000000):
+                            """Barra que combina animação com valor real"""
+                            bar_width = min(width, 50)
+                            pos = frame % (bar_width * 2)
+                            
+                            # Preenchimento baseado no valor
+                            if max_value > 0 and value > 0:
+                                filled_by_value = min(int((value / max_value) * bar_width), bar_width)
+                            else:
+                                filled_by_value = 0
+                            
+                            # Combinar animação com valor
+                            if pos < bar_width:
+                                filled = max(pos, filled_by_value)
+                            else:
+                                filled = max((bar_width * 2) - pos, filled_by_value)
+                            
+                            filled = min(filled, bar_width)
+                            
+                            # Criar barra com gradiente
+                            bar = ""
+                            for i in range(bar_width):
+                                if i < filled:
+                                    ratio = i / bar_width if bar_width > 0 else 0
+                                    if ratio < 0.3:
+                                        bar += Colors.BRIGHT_GREEN + "█"
+                                    elif ratio < 0.6:
+                                        bar += Colors.GREEN + "█"
+                                    elif ratio < 0.8:
+                                        bar += Colors.BRIGHT_CYAN + "█"
+                                    else:
+                                        bar += Colors.BRIGHT_BLUE + "█"
+                                else:
+                                    bar += Colors.DIM + "░"
+                            
+                            return bar + Colors.RESET
+                        
+                        # Exibir dashboard completo (criando linhas novas)
+                        print()
+                        print(Colors.BRIGHT_CYAN + "╔" + "═" * (terminal_width - 2) + "╗" + Colors.RESET)
+                        print(Colors.BRIGHT_CYAN + "║" + Colors.RESET + f" {Colors.BRIGHT_GREEN}{spinner} VPN Status{Colors.RESET} " + 
+                              f"{Colors.DIM}|{Colors.RESET} {Colors.CYAN}{current_time}{Colors.RESET} " +
+                              f"{Colors.DIM}|{Colors.RESET} {Colors.BRIGHT_YELLOW}Uptime: {uptime_hours:02d}:{uptime_minutes:02d}:{uptime_secs:02d}{Colors.RESET}" +
+                              " " * (terminal_width - 50) + Colors.BRIGHT_CYAN + "║" + Colors.RESET)
+                        print(Colors.BRIGHT_CYAN + "╠" + "═" * (terminal_width - 2) + "╣" + Colors.RESET)
+                        print(Colors.BRIGHT_CYAN + "║" + Colors.RESET + f" {Colors.BOLD}Interface:{Colors.RESET} {Colors.CYAN}{interface:<15}{Colors.RESET} " +
+                              f"{Colors.DIM}│{Colors.RESET} {Colors.BOLD}IP:{Colors.RESET} {Colors.CYAN}{vpn_ip:<15}{Colors.RESET} " +
+                              f"{Colors.DIM}│{Colors.RESET} {Colors.BOLD}MTU:{Colors.RESET} {Colors.CYAN}{mtu}{Colors.RESET}" +
+                              " " * (terminal_width - 60) + Colors.BRIGHT_CYAN + "║" + Colors.RESET)
+                        print(Colors.BRIGHT_CYAN + "╠" + "─" * (terminal_width - 2) + "╣" + Colors.RESET)
+                        print()
+                        
+                        # Estatísticas de entrada
+                        print(f"  {Colors.BRIGHT_BLUE}⬇️  ENTRADA (Download){Colors.RESET}")
+                        print(f"     {Colors.BOLD}Total:{Colors.RESET} {Colors.BRIGHT_GREEN}{format_bytes(rx_bytes):>15}{Colors.RESET} " +
+                              f"{Colors.DIM}({rx_percent:.1f}% do total){Colors.RESET}")
+                        print(f"     {Colors.BOLD}Velocidade:{Colors.RESET} {Colors.BRIGHT_GREEN}{format_speed(rx_speed):>15}{Colors.RESET}")
+                        print(f"     {Colors.BOLD}Packets:{Colors.RESET} {Colors.CYAN}{ipkts:,}{Colors.RESET}")
+                        rx_bar = get_enhanced_bar(animation_frame, terminal_width - 10, rx_bytes, max(rx_bytes, tx_bytes, 1))
+                        print(f"     {rx_bar}")
+                        print()
+                        
+                        # Estatísticas de saída
+                        print(f"  {Colors.BRIGHT_MAGENTA}⬆️  SAÍDA (Upload){Colors.RESET}")
+                        print(f"     {Colors.BOLD}Total:{Colors.RESET} {Colors.BRIGHT_GREEN}{format_bytes(tx_bytes):>15}{Colors.RESET} " +
+                              f"{Colors.DIM}({tx_percent:.1f}% do total){Colors.RESET}")
+                        print(f"     {Colors.BOLD}Velocidade:{Colors.RESET} {Colors.BRIGHT_GREEN}{format_speed(tx_speed):>15}{Colors.RESET}")
+                        print(f"     {Colors.BOLD}Packets:{Colors.RESET} {Colors.CYAN}{opkts:,}{Colors.RESET}")
+                        tx_bar = get_enhanced_bar(animation_frame + terminal_width, terminal_width - 10, tx_bytes, max(rx_bytes, tx_bytes, 1))
+                        print(f"     {tx_bar}")
+                        print()
+                        
+                        # Estatísticas gerais
+                        print(Colors.BRIGHT_CYAN + "╠" + "─" * (terminal_width - 2) + "╣" + Colors.RESET)
+                        print(Colors.BRIGHT_CYAN + "║" + Colors.RESET + f" {Colors.BOLD}📊 Estatísticas Gerais:{Colors.RESET}" +
+                              " " * (terminal_width - 25) + Colors.BRIGHT_CYAN + "║" + Colors.RESET)
+                        print(Colors.BRIGHT_CYAN + "║" + Colors.RESET + f"     {Colors.BOLD}Total Transferido:{Colors.RESET} {Colors.BRIGHT_GREEN}{format_bytes(total_bytes):>15}{Colors.RESET}" +
+                              " " * (terminal_width - 45) + Colors.BRIGHT_CYAN + "║" + Colors.RESET)
+                        print(Colors.BRIGHT_CYAN + "║" + Colors.RESET + f"     {Colors.BOLD}Velocidade Média:{Colors.RESET} {Colors.BRIGHT_GREEN}{format_speed(avg_speed):>15}{Colors.RESET}" +
+                              " " * (terminal_width - 45) + Colors.BRIGHT_CYAN + "║" + Colors.RESET)
+                        print(Colors.BRIGHT_CYAN + "╚" + "═" * (terminal_width - 2) + "╝" + Colors.RESET)
+                        
+                        lines_written = 0  # Deixar criar linhas novas
                     else:
                         spinner = get_spinner_char(int(time.time() * 5) % 8, 0)
                         sys.stdout.write('\r' + ' ' * 70 + '\r')
