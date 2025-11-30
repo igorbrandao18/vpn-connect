@@ -207,16 +207,40 @@ def get_interface_stats(interface):
         if result.returncode == 0:
             lines = result.stdout.split('\n')
             for line in lines:
-                # Procurar linha da interface (pode ter espaços antes)
-                if re.match(rf'^\s*{re.escape(interface)}\s+', line):
-                    parts = line.split()
-                    if len(parts) >= 7:
+                # Procurar linha da interface que começa com o nome (primeira linha, não a segunda com IP)
+                if re.match(rf'^{re.escape(interface)}\s+', line) and '<Link#' in line:
+                    # Dividir por espaços múltiplos para pegar os campos corretos
+                    parts = re.split(r'\s+', line.strip())
+                    if len(parts) >= 10:
                         try:
-                            # Obter MTU da interface
+                            # Obter MTU da interface (segundo campo)
                             mtu = int(parts[1]) if len(parts) > 1 else 1500
-                            # Ipkts (packets recebidos - índice 4) e Opkts (packets enviados - índice 6)
-                            ipkts = int(parts[4]) if len(parts) > 4 else 0
-                            opkts = int(parts[6]) if len(parts) > 6 else 0
+                            
+                            # Encontrar Ipkts e Opkts - podem estar em posições diferentes
+                            # Formato: Interface MTU Network Ipkts Ierrs Opkts Oerrs Coll
+                            # Mas pode ter campos vazios, então vamos procurar pelos números
+                            
+                            # Procurar por padrão: após Network (<Link#XX>), vem Ipkts
+                            # Vamos procurar pelos campos numéricos na ordem correta
+                            ipkts = 0
+                            opkts = 0
+                            
+                            # Tentar encontrar Ipkts e Opkts - geralmente são os primeiros números após o Network
+                            # Pular os primeiros 3 campos (Interface, MTU, Network)
+                            numeric_fields = []
+                            for part in parts[3:]:
+                                try:
+                                    numeric_fields.append(int(part))
+                                except ValueError:
+                                    continue
+                            
+                            # Se encontrou campos numéricos, Ipkts geralmente é o primeiro, Opkts o terceiro
+                            if len(numeric_fields) >= 4:
+                                ipkts = numeric_fields[0]  # Ipkts
+                                opkts = numeric_fields[2]   # Opkts (pula Ierrs)
+                            elif len(numeric_fields) >= 2:
+                                ipkts = numeric_fields[0]
+                                opkts = numeric_fields[1]
                             
                             # Estimar bytes usando MTU da interface (mais preciso)
                             # Usar 80% do MTU como média (considerando overhead)
@@ -224,7 +248,9 @@ def get_interface_stats(interface):
                             rx_bytes = ipkts * avg_packet_size
                             tx_bytes = opkts * avg_packet_size
                             
-                            return {'rx': rx_bytes, 'tx': tx_bytes}
+                            # Se pelo menos um tem valor, retornar (mesmo que o outro seja 0)
+                            if ipkts >= 0 and opkts >= 0:
+                                return {'rx': rx_bytes, 'tx': tx_bytes}
                         except (ValueError, IndexError) as e:
                             continue
         
