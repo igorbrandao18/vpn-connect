@@ -60,5 +60,9 @@ O script inicia automaticamente e fica monitorando. Quando detecta queda, recone
 
 - **NÃO é uma solução oficial da empresa.**
 
+- Por enquanto funciona apenas em sistemas **Linux e macOS**.
+
+- Estou trabalhando no meu tempo livre (à noite) para criar uma versão Windows (.bat).
+
 - Se alguém quiser usar, ficarei feliz em compartilhar o código e ajudar na implementação.
 
