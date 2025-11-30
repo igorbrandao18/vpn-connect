@@ -1,22 +1,26 @@
 🔐 Solução para VPN Sonepar - Auto-Reconexão
 
-📋 Problema Identificado
+PROBLEMA IDENTIFICADO
+--------------------
 
 A VPN da Sonepar (dtc.sonepar.com.br) estava apresentando quedas intermitentes durante o uso, causando interrupções no trabalho e necessidade de reconexão manual frequente.
 
-✅ Solução Implementada
+SOLUÇÃO IMPLEMENTADA
+--------------------
 
-Foi criado um script Python que monitora a conexão VPN e reconecta automaticamente quando detecta desconexão.
+Criei um script Python que monitora a conexão VPN e reconecta automaticamente quando detecta desconexão.
 
-Funcionalidades:
+FUNCIONALIDADES
+--------------
 
-- 🔄 Monitoramento contínuo: Verifica o status da VPN a cada 5 segundos
-- 🔁 Auto-reconexão: Reconecta automaticamente quando detecta queda
-- 📊 Monitoramento de tráfego: Mostra estatísticas de entrada/saída em tempo real
-- 🔐 Autenticação Azure AD: Integra com Azure CLI para autenticação SAML
-- 🟢 Status visual: Indica claramente quando está conectada/desconectada
+• Monitoramento contínuo: Verifica o status da VPN a cada 5 segundos
+• Auto-reconexão: Reconecta automaticamente quando detecta queda
+• Monitoramento de tráfego: Mostra estatísticas de entrada/saída em tempo real
+• Autenticação Azure AD: Integra com Azure CLI para autenticação SAML
+• Status visual: Indica claramente quando está conectada/desconectada
 
-Como funciona:
+COMO FUNCIONA
+------------
 
 1. O script verifica continuamente se a VPN está conectada
 2. Se detectar desconexão, aguarda 10 segundos e tenta reconectar
@@ -24,43 +28,45 @@ Como funciona:
 4. Mantém a conexão ativa e monitora o status
 5. Exibe estatísticas de tráfego em tempo real
 
-Tecnologias utilizadas:
+TECNOLOGIAS UTILIZADAS
+----------------------
 
-- Python 3 - Linguagem do script
-- openfortivpn - Cliente VPN open-source para FortiClient SSL VPN
-- Azure CLI - Para autenticação Azure AD
-- macOS nativo - Integração com sistema operacional
+• Python 3 - Linguagem do script
+• openfortivpn - Cliente VPN open-source para FortiClient SSL VPN
+• Azure CLI - Para autenticação Azure AD
+• macOS/Linux nativo - Integração com sistema operacional
 
-Arquivos criados:
+ARQUIVOS CRIADOS
+---------------
 
-- vpn_menu.py - Script principal de auto-reconexão
-- connect_vpn.py - Script de conexão à VPN
-- monitor_vpn.py - Painel de monitoramento de tráfego
+• vpn_menu.py - Script principal de auto-reconexão
+• connect_vpn.py - Script de conexão à VPN
+• monitor_vpn.py - Painel de monitoramento de tráfego
 
-Exemplo de uso:
+EXEMPLO DE USO
+--------------
 
 python3 vpn_menu.py
 
 O script inicia automaticamente e fica monitorando. Quando detecta queda, reconecta sozinho.
 
-Evidência de funcionamento:
+EVIDÊNCIA DE FUNCIONAMENTO
+--------------------------
 
-- ✅ Detecta desconexões automaticamente
-- ✅ Reconecta sem intervenção manual
-- ✅ Mantém conexão estável
-- ✅ Mostra estatísticas de tráfego em tempo real
+✅ Detecta desconexões automaticamente
+✅ Reconecta sem intervenção manual
+✅ Mantém conexão estável
+✅ Mostra estatísticas de tráfego em tempo real
 
----
+OBSERVAÇÕES IMPORTANTES
+-----------------------
 
-Observações:
+• Esta solução foi criada apenas para meu uso pessoal para mitigar as quedas intermitentes da VPN.
 
-- Esta solução foi criada apenas para meu uso pessoal para mitigar as quedas intermitentes da VPN.
+• NÃO é uma solução oficial da empresa.
 
-- NÃO é uma solução oficial da empresa.
+• Por enquanto funciona apenas em sistemas Linux e macOS.
 
-- Por enquanto funciona apenas em sistemas Linux e macOS.
+• Estou trabalhando no meu tempo livre (à noite) para criar uma versão Windows (.bat).
 
-- Estou trabalhando no meu tempo livre (à noite) para criar uma versão Windows (.bat).
-
-- Se alguém quiser usar, ficarei feliz em compartilhar o código e ajudar na implementação.
-
+• Se alguém quiser usar, ficarei feliz em compartilhar o código e ajudar na implementação.
