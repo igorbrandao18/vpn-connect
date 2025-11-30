@@ -107,37 +107,67 @@ def get_vpn_interface():
 def get_interface_stats(interface):
     """Obtém estatísticas de tráfego de uma interface"""
     try:
+        # Primeiro tentar ifconfig (funciona para a maioria das interfaces)
         result = subprocess.run(['ifconfig', interface], capture_output=True, text=True)
-        if result.returncode != 0:
-            return None
+        if result.returncode == 0:
+            # Extrair bytes recebidos e enviados
+            rx_bytes = 0
+            tx_bytes = 0
+            
+            # Padrão macOS: "RX packets 1234 bytes 567890"
+            rx_match = re.search(r'RX.*?bytes\s+(\d+)', result.stdout, re.IGNORECASE)
+            tx_match = re.search(r'TX.*?bytes\s+(\d+)', result.stdout, re.IGNORECASE)
+            
+            if rx_match:
+                rx_bytes = int(rx_match.group(1))
+            if tx_match:
+                tx_bytes = int(tx_match.group(1))
+            
+            # Tentar formato alternativo (linhas separadas)
+            if rx_bytes == 0 or tx_bytes == 0:
+                lines = result.stdout.split('\n')
+                for line in lines:
+                    if 'RX' in line.upper() and 'bytes' in line.lower():
+                        match = re.search(r'(\d+)\s+bytes', line)
+                        if match:
+                            rx_bytes = int(match.group(1))
+                    if 'TX' in line.upper() and 'bytes' in line.lower():
+                        match = re.search(r'(\d+)\s+bytes', line)
+                        if match:
+                            tx_bytes = int(match.group(1))
+            
+            # Se encontrou estatísticas no ifconfig, retornar
+            if rx_bytes > 0 or tx_bytes > 0:
+                return {'rx': rx_bytes, 'tx': tx_bytes}
         
-        # Extrair bytes recebidos e enviados
-        rx_bytes = 0
-        tx_bytes = 0
-        
-        # Padrão macOS: "RX packets 1234 bytes 567890"
-        rx_match = re.search(r'RX.*?bytes\s+(\d+)', result.stdout, re.IGNORECASE)
-        tx_match = re.search(r'TX.*?bytes\s+(\d+)', result.stdout, re.IGNORECASE)
-        
-        if rx_match:
-            rx_bytes = int(rx_match.group(1))
-        if tx_match:
-            tx_bytes = int(tx_match.group(1))
-        
-        # Tentar formato alternativo (linhas separadas)
-        if rx_bytes == 0 or tx_bytes == 0:
+        # Para interfaces PPP, ifconfig não mostra bytes, usar netstat
+        # Formato netstat -ibn: Interface MTU Network Address Ipkts Ierrs Opkts Oerrs Coll
+        result = subprocess.run(['netstat', '-ibn'], capture_output=True, text=True)
+        if result.returncode == 0:
             lines = result.stdout.split('\n')
             for line in lines:
-                if 'RX' in line.upper() and 'bytes' in line.lower():
-                    match = re.search(r'(\d+)\s+bytes', line)
-                    if match:
-                        rx_bytes = int(match.group(1))
-                if 'TX' in line.upper() and 'bytes' in line.lower():
-                    match = re.search(r'(\d+)\s+bytes', line)
-                    if match:
-                        tx_bytes = int(match.group(1))
+                # Procurar linha da interface (pode ter espaços antes)
+                if re.match(rf'^\s*{re.escape(interface)}\s+', line):
+                    parts = line.split()
+                    if len(parts) >= 7:
+                        try:
+                            # Obter MTU da interface
+                            mtu = int(parts[1]) if len(parts) > 1 else 1500
+                            # Ipkts (packets recebidos - índice 4) e Opkts (packets enviados - índice 6)
+                            ipkts = int(parts[4]) if len(parts) > 4 else 0
+                            opkts = int(parts[6]) if len(parts) > 6 else 0
+                            
+                            # Estimar bytes usando MTU da interface (mais preciso)
+                            # Usar 80% do MTU como média (considerando overhead)
+                            avg_packet_size = int(mtu * 0.8)
+                            rx_bytes = ipkts * avg_packet_size
+                            tx_bytes = opkts * avg_packet_size
+                            
+                            return {'rx': rx_bytes, 'tx': tx_bytes}
+                        except (ValueError, IndexError) as e:
+                            continue
         
-        return {'rx': rx_bytes, 'tx': tx_bytes}
+        return None
     except Exception as e:
         return None
 
