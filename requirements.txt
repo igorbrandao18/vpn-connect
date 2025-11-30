@@ -1,0 +1,14 @@
+# VPN Auto-Reconnect - Dependências Python
+# Este projeto usa apenas a biblioteca padrão do Python, sem dependências externas
+
+# Requisitos do Sistema:
+# - macOS (testado em macOS 12+)
+# - Python 3.6+
+# - openfortivpn (brew install openfortivpn)
+# - Azure CLI (az login)
+
+# Python 3.6+ é necessário para:
+# - Type hints (opcional, mas recomendado)
+# - f-strings
+# - subprocess.run() com text=True
+
