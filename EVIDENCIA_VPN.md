@@ -56,7 +56,7 @@ O script inicia automaticamente e fica monitorando. Quando detecta queda, recone
 
 **Observações:**
 
-- Esta solução foi criada apenas para meu uso pessoal para mitigar as quedas intermitentes da VPN enquanto o problema de infraestrutura é investigado pelo time de TI.
+- Esta solução foi criada apenas para meu uso pessoal para mitigar as quedas intermitentes da VPN.
 
 - **NÃO é uma solução oficial da empresa.**
 
