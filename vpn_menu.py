@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Menu interativo para gerenciar VPN
+Menu simplificado - Monitora e reconecta VPN automaticamente
 """
 
 import subprocess
@@ -15,10 +15,10 @@ def clear_screen():
     os.system('clear' if os.name != 'nt' else 'cls')
 
 def print_header():
-    """Imprime cabeçalho do menu"""
+    """Imprime cabeçalho"""
     clear_screen()
     print("=" * 70)
-    print(" " * 25 + "🔐 VPN MANAGER")
+    print(" " * 20 + "🔐 VPN AUTO-RECONNECT")
     print("=" * 70)
     print()
 
@@ -39,244 +39,166 @@ def check_vpn_connected():
     except:
         return False
 
-def get_vpn_status():
-    """Obtém status detalhado da VPN"""
+def get_vpn_interface():
+    """Identifica a interface VPN"""
     try:
-        # Verificar processos
-        result = subprocess.run(['pgrep', '-f', 'openfortivpn'], capture_output=True, text=True)
-        if result.returncode == 0:
-            pids = result.stdout.strip().split('\n')
-            return f"🟢 Conectada (PID: {', '.join(pids)})"
+        result = subprocess.run(['ifconfig'], capture_output=True, text=True)
+        lines = result.stdout.split('\n')
         
-        # Verificar scutil
-        result = subprocess.run(['scutil', '--nc', 'list'], capture_output=True, text=True)
-        if 'Connected' in result.stdout:
-            return "🟢 Conectada"
-        
-        return "🔴 Desconectada"
+        current_interface = None
+        for i, line in enumerate(lines):
+            match = re.search(r'^([a-z0-9]+):', line)
+            if match:
+                current_interface = match.group(1)
+            
+            if current_interface and ('ppp' in current_interface.lower() or 'utun' in current_interface.lower()):
+                if i + 1 < len(lines):
+                    next_lines = '\n'.join(lines[i:i+5])
+                    if 'inet ' in next_lines and '127.0.0.1' not in next_lines:
+                        return current_interface
+        return None
     except:
-        return "❓ Desconhecido"
+        return None
 
-def connect_vpn():
-    """Conecta à VPN"""
-    print_header()
-    print("🔌 Conectando à VPN...")
-    print()
-    
+def connect_vpn_process():
+    """Conecta à VPN em processo separado"""
     gateway = "dtc.sonepar.com.br"
     port = 443
-    
-    print(f"Gateway: {gateway}:{port}")
-    print()
-    
-    # Verificar se já está conectada
-    if check_vpn_connected():
-        print("⚠️  VPN já está conectada!")
-        input("\nPressione Enter para voltar ao menu...")
-        return
-    
-    # Executar script de conexão em background
     script_path = os.path.join(os.path.dirname(__file__), 'connect_vpn.py')
     
-    print("💡 Executando conexão...")
-    print("💡 O processo será executado em background")
-    print("💡 Use o monitor para acompanhar o status")
-    print()
-    
     try:
-        # Executar em background
         process = subprocess.Popen(
             [sys.executable, script_path, '--gateway', gateway, '--port', str(port)],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE
         )
-        
-        print(f"✅ Processo iniciado (PID: {process.pid})")
-        print("💡 A conexão está sendo estabelecida...")
-        print("💡 Aguarde alguns segundos e verifique o status")
-        
+        return process
     except Exception as e:
-        print(f"❌ Erro ao conectar: {e}")
-    
-    input("\nPressione Enter para voltar ao menu...")
+        return None
 
-def disconnect_vpn():
-    """Desconecta a VPN"""
+def monitor_and_reconnect():
+    """Monitora VPN e reconecta automaticamente"""
     print_header()
-    print("🛑 Desconectando VPN...")
+    print("🔄 Modo Auto-Reconexão Ativado")
+    print()
+    print("💡 O sistema irá:")
+    print("   • Conectar à VPN automaticamente")
+    print("   • Monitorar a conexão continuamente")
+    print("   • Reconectar se desconectar")
+    print()
+    print("=" * 70)
     print()
     
-    if not check_vpn_connected():
-        print("⚠️  VPN não está conectada!")
-        input("\nPressione Enter para voltar ao menu...")
-        return
+    connection_process = None
+    last_check = time.time()
+    check_interval = 5  # Verificar a cada 5 segundos
+    reconnect_delay = 10  # Aguardar 10 segundos antes de reconectar
     
     try:
-        # Matar processos openfortivpn
-        result = subprocess.run(['pkill', '-f', 'openfortivpn'], capture_output=True)
-        
-        if result.returncode == 0:
-            print("✅ Processos openfortivpn finalizados")
-        else:
-            print("⚠️  Nenhum processo openfortivpn encontrado")
-        
-        # Tentar desconectar via scutil
-        result = subprocess.run(['scutil', '--nc', 'list'], capture_output=True, text=True)
-        if 'Connected' in result.stdout:
-            # Extrair nome da VPN e desconectar
-            lines = result.stdout.split('\n')
-            for line in lines:
-                if 'Connected' in line:
-                    # Tentar extrair nome
-                    parts = line.split()
-                    if parts:
-                        vpn_name = parts[0].strip('*').strip()
-                        subprocess.run(['scutil', '--nc', 'stop', vpn_name], capture_output=True)
-                        print(f"✅ VPN '{vpn_name}' desconectada")
-        
-        time.sleep(1)
-        
-        if check_vpn_connected():
-            print("⚠️  Ainda há processos VPN ativos")
-        else:
-            print("✅ VPN desconectada com sucesso!")
-        
-    except Exception as e:
-        print(f"❌ Erro ao desconectar: {e}")
+        while True:
+            current_time = datetime.now().strftime("%H:%M:%S")
+            is_connected = check_vpn_connected()
+            
+            # Verificar se processo de conexão ainda está rodando
+            if connection_process:
+                if connection_process.poll() is not None:
+                    # Processo terminou
+                    connection_process = None
+            
+            # Se não está conectado e não há processo de conexão
+            if not is_connected and connection_process is None:
+                print(f"[{current_time}] ⚠️  VPN desconectada - Reconectando em {reconnect_delay}s...")
+                time.sleep(reconnect_delay)
+                
+                print(f"[{current_time}] 🔌 Tentando conectar...")
+                connection_process = connect_vpn_process()
+                
+                if connection_process:
+                    print(f"[{current_time}] ✅ Processo de conexão iniciado (PID: {connection_process.pid})")
+                else:
+                    print(f"[{current_time}] ❌ Erro ao iniciar conexão")
+            
+            # Se está conectado
+            elif is_connected:
+                # Verificar interface para obter estatísticas
+                interface = get_vpn_interface()
+                if interface:
+                    # Obter estatísticas básicas
+                    try:
+                        result = subprocess.run(['ifconfig', interface], capture_output=True, text=True)
+                        import re
+                        rx_match = re.search(r'RX.*?bytes\s+(\d+)', result.stdout, re.IGNORECASE)
+                        tx_match = re.search(r'TX.*?bytes\s+(\d+)', result.stdout, re.IGNORECASE)
+                        
+                        rx_bytes = int(rx_match.group(1)) if rx_match else 0
+                        tx_bytes = int(tx_match.group(1)) if tx_match else 0
+                        
+                        # Formatar bytes
+                        def format_bytes(b):
+                            for unit in ['B', 'KB', 'MB', 'GB']:
+                                if b < 1024.0:
+                                    return f"{b:.2f} {unit}"
+                                b /= 1024.0
+                            return f"{b:.2f} TB"
+                        
+                        print(f"[{current_time}] 🟢 VPN Conectada | Interface: {interface}")
+                        print(f"   ⬇️  Entrada: {format_bytes(rx_bytes)} | ⬆️  Saída: {format_bytes(tx_bytes)}")
+                    except:
+                        print(f"[{current_time}] 🟢 VPN Conectada | Interface: {interface}")
+                else:
+                    print(f"[{current_time}] 🟢 VPN Conectada")
+            
+            # Aguardar antes da próxima verificação
+            time.sleep(check_interval)
+            
+            # Limpar linha anterior (opcional, para não poluir muito)
+            if time.time() - last_check > 30:  # A cada 30 segundos, limpar tela
+                print_header()
+                print("🔄 Modo Auto-Reconexão Ativado")
+                print("=" * 70)
+                print()
+                last_check = time.time()
     
-    input("\nPressione Enter para voltar ao menu...")
-
-def monitor_vpn():
-    """Abre o monitor de tráfego"""
-    print_header()
-    print("📊 Abrindo monitor de tráfego...")
-    print()
-    
-    script_path = os.path.join(os.path.dirname(__file__), 'monitor_vpn.py')
-    
-    try:
-        # Executar monitor
-        subprocess.run([sys.executable, script_path])
     except KeyboardInterrupt:
-        print("\n🛑 Monitor encerrado")
-    except Exception as e:
-        print(f"❌ Erro ao abrir monitor: {e}")
-        input("\nPressione Enter para voltar ao menu...")
-
-def show_status():
-    """Mostra status detalhado da VPN"""
-    print_header()
-    print("📊 Status da VPN")
-    print("-" * 70)
-    print()
-    
-    status = get_vpn_status()
-    print(f"Status: {status}")
-    print()
-    
-    # Verificar processos
-    try:
-        result = subprocess.run(['pgrep', '-fl', 'openfortivpn'], capture_output=True, text=True)
-        if result.returncode == 0:
-            print("Processos ativos:")
-            for line in result.stdout.strip().split('\n'):
-                if line:
-                    print(f"  • {line}")
-        else:
-            print("Nenhum processo openfortivpn encontrado")
-    except:
-        pass
-    
-    print()
-    
-    # Verificar interfaces de rede
-    try:
-        result = subprocess.run(['ifconfig'], capture_output=True, text=True)
-        vpn_interfaces = []
-        for line in result.stdout.split('\n'):
-            if 'ppp' in line.lower() or 'utun' in line.lower():
-                match = line.split(':')
-                if match:
-                    interface = match[0]
-                    if interface not in vpn_interfaces:
-                        vpn_interfaces.append(interface)
+        print()
+        print("=" * 70)
+        print("🛑 Encerrando monitoramento...")
         
-        if vpn_interfaces:
-            print("Interfaces VPN:")
-            for interface in vpn_interfaces:
-                print(f"  • {interface}")
-        else:
-            print("Nenhuma interface VPN encontrada")
-    except:
-        pass
-    
-    print()
-    
-    # Verificar conexões de rede
-    try:
-        result = subprocess.run(['netstat', '-rn'], capture_output=True, text=True)
-        if 'ppp' in result.stdout or 'utun' in result.stdout:
-            print("Rotas VPN ativas: Sim")
-        else:
-            print("Rotas VPN ativas: Não")
-    except:
-        pass
-    
-    print()
-    input("Pressione Enter para voltar ao menu...")
-
-def show_menu():
-    """Mostra o menu principal"""
-    print_header()
-    
-    status = get_vpn_status()
-    print(f"Status atual: {status}")
-    print()
-    print("-" * 70)
-    print()
-    print("Opções disponíveis:")
-    print()
-    print("  1. 🔌 Conectar à VPN")
-    print("  2. 🛑 Desconectar VPN")
-    print("  3. 📊 Monitorar Tráfego")
-    print("  4. 📈 Ver Status Detalhado")
-    print("  5. ❌ Sair")
-    print()
-    print("-" * 70)
-    print()
+        # Matar processos de conexão
+        if connection_process:
+            connection_process.terminate()
+        
+        # Desconectar VPN
+        try:
+            subprocess.run(['pkill', '-f', 'openfortivpn'], capture_output=True)
+        except:
+            pass
+        
+        print("✅ Encerrado")
+        sys.exit(0)
 
 def main():
     """Função principal"""
-    while True:
-        show_menu()
-        
-        try:
-            choice = input("Escolha uma opção (1-5): ").strip()
-            
-            if choice == '1':
-                connect_vpn()
-            elif choice == '2':
-                disconnect_vpn()
-            elif choice == '3':
-                monitor_vpn()
-            elif choice == '4':
-                show_status()
-            elif choice == '5':
-                clear_screen()
-                print("👋 Até logo!")
-                sys.exit(0)
-            else:
-                print("\n❌ Opção inválida! Tente novamente.")
-                time.sleep(1)
-        
-        except KeyboardInterrupt:
-            clear_screen()
-            print("\n👋 Até logo!")
-            sys.exit(0)
-        except Exception as e:
-            print(f"\n❌ Erro: {e}")
-            input("Pressione Enter para continuar...")
+    import re  # Importar regex aqui
+    
+    print_header()
+    print("🔐 VPN Auto-Reconnect")
+    print()
+    print("Este script irá:")
+    print("  • Conectar à VPN automaticamente")
+    print("  • Monitorar a conexão continuamente")
+    print("  • Reconectar automaticamente se desconectar")
+    print()
+    print("=" * 70)
+    print()
+    
+    try:
+        input("Pressione Enter para iniciar (ou Ctrl+C para sair)...")
+        monitor_and_reconnect()
+    except KeyboardInterrupt:
+        clear_screen()
+        print("👋 Até logo!")
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()
-

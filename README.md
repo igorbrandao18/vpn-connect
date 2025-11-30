@@ -21,17 +21,17 @@ az login
 
 ## Uso
 
-### Menu Interativo (Recomendado)
+### Auto-Reconexão (Recomendado)
 
 ```bash
 python3 vpn_menu.py
 ```
 
-O menu oferece todas as funcionalidades em uma interface simples:
-- 🔌 Conectar à VPN
-- 🛑 Desconectar VPN
-- 📊 Monitorar Tráfego
-- 📈 Ver Status Detalhado
+O script monitora e reconecta automaticamente:
+- 🔌 Conecta à VPN automaticamente
+- 🔄 Monitora a conexão continuamente
+- 🔁 Reconecta automaticamente se desconectar
+- 📊 Mostra estatísticas de tráfego em tempo real
 
 ### Uso Direto dos Scripts
 
@@ -60,12 +60,12 @@ O painel mostra em tempo real:
 
 ## Funcionalidades
 
-### Menu Interativo (`vpn_menu.py`)
-- 🎯 Interface simples e intuitiva
-- 🔌 Conectar/Desconectar VPN com um clique
-- 📊 Acesso rápido ao monitor de tráfego
-- 📈 Status detalhado da conexão
-- 🔄 Atualização automática do status
+### Auto-Reconexão (`vpn_menu.py`)
+- 🔄 Monitora conexão VPN continuamente
+- 🔁 Reconecta automaticamente se desconectar
+- 📊 Mostra estatísticas de tráfego em tempo real
+- 🟢 Status visual da conexão
+- ⚡ Verificação a cada 5 segundos
 
 ### Script de Conexão (`connect_vpn.py`)
 - ✅ Verifica autenticação Azure CLI automaticamente
