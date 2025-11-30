@@ -21,7 +21,21 @@ az login
 
 ## Uso
 
-### Conectar à VPN
+### Menu Interativo (Recomendado)
+
+```bash
+python3 vpn_menu.py
+```
+
+O menu oferece todas as funcionalidades em uma interface simples:
+- 🔌 Conectar à VPN
+- 🛑 Desconectar VPN
+- 📊 Monitorar Tráfego
+- 📈 Ver Status Detalhado
+
+### Uso Direto dos Scripts
+
+#### Conectar à VPN
 
 ```bash
 python3 connect_vpn.py --gateway dtc.sonepar.com.br
@@ -29,7 +43,7 @@ python3 connect_vpn.py --gateway dtc.sonepar.com.br
 
 **Importante:** O script precisa ficar rodando para manter a VPN conectada. Após conectar, o script continuará monitorando a conexão. Para desconectar, pressione `Ctrl+C`.
 
-### Monitorar Tráfego VPN
+#### Monitorar Tráfego VPN
 
 Em outro terminal, execute o painel de monitoramento:
 
@@ -45,6 +59,13 @@ O painel mostra em tempo real:
 - 🟢 Status da conexão
 
 ## Funcionalidades
+
+### Menu Interativo (`vpn_menu.py`)
+- 🎯 Interface simples e intuitiva
+- 🔌 Conectar/Desconectar VPN com um clique
+- 📊 Acesso rápido ao monitor de tráfego
+- 📈 Status detalhado da conexão
+- 🔄 Atualização automática do status
 
 ### Script de Conexão (`connect_vpn.py`)
 - ✅ Verifica autenticação Azure CLI automaticamente
