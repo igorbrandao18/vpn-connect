@@ -8,6 +8,7 @@ import sys
 import os
 import time
 import threading
+import re
 from datetime import datetime
 
 def clear_screen():
@@ -179,8 +180,6 @@ def monitor_and_reconnect():
 
 def main():
     """Função principal"""
-    import re  # Importar regex aqui
-    
     print_header()
     print("🔐 VPN Auto-Reconnect")
     print()
