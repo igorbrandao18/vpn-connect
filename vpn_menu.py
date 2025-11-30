@@ -225,22 +225,12 @@ def get_interface_stats(interface):
                             ipkts = 0
                             opkts = 0
                             
-                            # Tentar encontrar Ipkts e Opkts - geralmente são os primeiros números após o Network
-                            # Pular os primeiros 3 campos (Interface, MTU, Network)
-                            numeric_fields = []
-                            for part in parts[3:]:
-                                try:
-                                    numeric_fields.append(int(part))
-                                except ValueError:
-                                    continue
-                            
-                            # Se encontrou campos numéricos, Ipkts geralmente é o primeiro, Opkts o terceiro
-                            if len(numeric_fields) >= 4:
-                                ipkts = numeric_fields[0]  # Ipkts
-                                opkts = numeric_fields[2]   # Opkts (pula Ierrs)
-                            elif len(numeric_fields) >= 2:
-                                ipkts = numeric_fields[0]
-                                opkts = numeric_fields[1]
+                            # Formato real: ppp0 1354 <Link#24> 0 0 0 4 0 796 0
+                            #              [0]   [1]  [2]       [3][4][5][6][7][8] [9]
+                            #              Interface MTU Network Address Ipkts Ierrs Opkts Oerrs outro Coll
+                            # Então: Ipkts está em parts[4], Opkts está em parts[6]
+                            ipkts = int(parts[4]) if len(parts) > 4 else 0  # Ipkts (packets recebidos)
+                            opkts = int(parts[6]) if len(parts) > 6 else 0  # Opkts (packets enviados)
                             
                             # Estimar bytes usando MTU da interface (mais preciso)
                             # Usar 80% do MTU como média (considerando overhead)
