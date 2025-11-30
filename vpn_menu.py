@@ -11,16 +11,77 @@ import threading
 import re
 from datetime import datetime
 
+# Cores ANSI para terminal
+class Colors:
+    RESET = '\033[0m'
+    BOLD = '\033[1m'
+    DIM = '\033[2m'
+    
+    # Cores básicas
+    BLACK = '\033[30m'
+    RED = '\033[31m'
+    GREEN = '\033[32m'
+    YELLOW = '\033[33m'
+    BLUE = '\033[34m'
+    MAGENTA = '\033[35m'
+    CYAN = '\033[36m'
+    WHITE = '\033[37m'
+    
+    # Cores brilhantes
+    BRIGHT_BLACK = '\033[90m'
+    BRIGHT_RED = '\033[91m'
+    BRIGHT_GREEN = '\033[92m'
+    BRIGHT_YELLOW = '\033[93m'
+    BRIGHT_BLUE = '\033[94m'
+    BRIGHT_MAGENTA = '\033[95m'
+    BRIGHT_CYAN = '\033[96m'
+    BRIGHT_WHITE = '\033[97m'
+
+# Spinners animados
+SPINNERS = [
+    ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'],
+    ['⣾', '⣽', '⣻', '⢿', '⡿', '⣟', '⣯', '⣷'],
+    ['◐', '◓', '◑', '◒'],
+    ['◴', '◷', '◶', '◵'],
+    ['▁', '▃', '▄', '▅', '▆', '▇', '█', '▇', '▆', '▅', '▄', '▃'],
+    ['←', '↖', '↑', '↗', '→', '↘', '↓', '↙'],
+]
+
+def get_spinner_char(frame, spinner_type=0):
+    """Retorna caractere do spinner baseado no frame"""
+    spinner = SPINNERS[spinner_type % len(SPINNERS)]
+    return spinner[frame % len(spinner)]
+
+def print_animated(text, color=Colors.RESET, end='\n'):
+    """Imprime texto com animação"""
+    sys.stdout.write(f"{color}{text}{Colors.RESET}{end}")
+    sys.stdout.flush()
+
+def animate_spinner(text, duration=2, spinner_type=0):
+    """Anima um spinner por um tempo"""
+    start_time = time.time()
+    frame = 0
+    while time.time() - start_time < duration:
+        spinner_char = get_spinner_char(frame, spinner_type)
+        sys.stdout.write(f'\r{spinner_char} {text}')
+        sys.stdout.flush()
+        time.sleep(0.1)
+        frame += 1
+    sys.stdout.write('\r' + ' ' * (len(text) + 3) + '\r')
+    sys.stdout.flush()
+
 def clear_screen():
     """Limpa a tela"""
     os.system('clear' if os.name != 'nt' else 'cls')
 
 def print_header():
-    """Imprime cabeçalho"""
+    """Imprime cabeçalho com animação"""
     clear_screen()
-    print("=" * 70)
-    print(" " * 20 + "🔐 VPN AUTO-RECONNECT")
-    print("=" * 70)
+    print(Colors.BRIGHT_CYAN + "=" * 70 + Colors.RESET)
+    title = "🔐 VPN AUTO-RECONNECT"
+    padding = (70 - len(title)) // 2
+    print(" " * padding + Colors.BOLD + Colors.BRIGHT_GREEN + title + Colors.RESET)
+    print(Colors.BRIGHT_CYAN + "=" * 70 + Colors.RESET)
     print()
 
 def check_vpn_connected():
@@ -190,14 +251,14 @@ def connect_vpn_process():
 def monitor_and_reconnect():
     """Monitora VPN e reconecta automaticamente"""
     print_header()
-    print("🔄 Modo Auto-Reconexão Ativado")
+    print(Colors.BRIGHT_YELLOW + "🔄 Modo Auto-Reconexão Ativado" + Colors.RESET)
     print()
-    print("💡 O sistema irá:")
-    print("   • Conectar à VPN automaticamente")
-    print("   • Monitorar a conexão continuamente")
-    print("   • Reconectar se desconectar")
+    print(Colors.BRIGHT_BLUE + "💡 O sistema irá:" + Colors.RESET)
+    print(Colors.CYAN + "   • Conectar à VPN automaticamente" + Colors.RESET)
+    print(Colors.CYAN + "   • Monitorar a conexão continuamente" + Colors.RESET)
+    print(Colors.CYAN + "   • Reconectar se desconectar" + Colors.RESET)
     print()
-    print("=" * 70)
+    print(Colors.BRIGHT_CYAN + "=" * 70 + Colors.RESET)
     print()
     
     connection_process = None
@@ -218,16 +279,26 @@ def monitor_and_reconnect():
             
             # Se não está conectado e não há processo de conexão
             if not is_connected and connection_process is None:
-                print(f"[{current_time}] ⚠️  VPN desconectada - Reconectando em {reconnect_delay}s...")
-                time.sleep(reconnect_delay)
+                print(Colors.BRIGHT_RED + f"[{current_time}] ⚠️  VPN desconectada" + Colors.RESET)
                 
-                print(f"[{current_time}] 🔌 Tentando conectar...")
+                # Animação de contagem regressiva
+                for remaining in range(reconnect_delay, 0, -1):
+                    spinner = get_spinner_char(int(time.time() * 10) % 8, 1)
+                    sys.stdout.write(f'\r{Colors.BRIGHT_YELLOW}{spinner} Reconectando em {remaining}s...{Colors.RESET}')
+                    sys.stdout.flush()
+                    time.sleep(1)
+                sys.stdout.write('\r' + ' ' * 50 + '\r')
+                sys.stdout.flush()
+                
+                print(Colors.BRIGHT_BLUE + f"[{current_time}] 🔌 Tentando conectar..." + Colors.RESET)
+                animate_spinner("Iniciando conexão", 1, 2)
+                
                 connection_process = connect_vpn_process()
                 
                 if connection_process:
-                    print(f"[{current_time}] ✅ Processo de conexão iniciado (PID: {connection_process.pid})")
+                    print(Colors.BRIGHT_GREEN + f"[{current_time}] ✅ Processo de conexão iniciado (PID: {connection_process.pid})" + Colors.RESET)
                 else:
-                    print(f"[{current_time}] ❌ Erro ao iniciar conexão")
+                    print(Colors.BRIGHT_RED + f"[{current_time}] ❌ Erro ao iniciar conexão" + Colors.RESET)
             
             # Se está conectado
             elif is_connected:
@@ -248,13 +319,33 @@ def monitor_and_reconnect():
                                 b /= 1024.0
                             return f"{b:.2f} PB"
                         
-                        print(f"[{current_time}] 🟢 VPN Conectada | Interface: {interface}")
-                        print(f"   ⬇️  Entrada: {format_bytes(rx_bytes)} | ⬆️  Saída: {format_bytes(tx_bytes)}")
+                        # Animação de status conectado
+                        spinner = get_spinner_char(int(time.time() * 5) % 8, 0)
+                        status_indicator = Colors.BRIGHT_GREEN + "🟢" + Colors.RESET
+                        
+                        # Barra de progresso visual para tráfego
+                        def get_traffic_bar(value, max_value=1000000000, width=20):
+                            if max_value == 0:
+                                return "░" * width
+                            filled = min(int((value / max_value) * width), width)
+                            bar = Colors.BRIGHT_GREEN + "█" * filled + Colors.DIM + "░" * (width - filled) + Colors.RESET
+                            return bar
+                        
+                        # Calcular porcentagem de uso (estimativa)
+                        max_traffic = max(rx_bytes, tx_bytes, 1)
+                        rx_bar = get_traffic_bar(rx_bytes, max_traffic * 1.2, 15)
+                        tx_bar = get_traffic_bar(tx_bytes, max_traffic * 1.2, 15)
+                        
+                        print(f"{Colors.BRIGHT_GREEN}[{current_time}] {spinner} VPN Conectada{Colors.RESET} | {Colors.CYAN}Interface: {interface}{Colors.RESET}")
+                        print(f"   {Colors.BRIGHT_BLUE}⬇️  Entrada:{Colors.RESET} {Colors.BRIGHT_GREEN}{format_bytes(rx_bytes):>12}{Colors.RESET} {rx_bar}")
+                        print(f"   {Colors.BRIGHT_MAGENTA}⬆️  Saída:{Colors.RESET}   {Colors.BRIGHT_GREEN}{format_bytes(tx_bytes):>12}{Colors.RESET} {tx_bar}")
                     else:
-                        print(f"[{current_time}] 🟢 VPN Conectada | Interface: {interface}")
-                        print(f"   ⚠️  Estatísticas não disponíveis")
+                        spinner = get_spinner_char(int(time.time() * 5) % 8, 0)
+                        print(f"{Colors.BRIGHT_GREEN}[{current_time}] {spinner} VPN Conectada{Colors.RESET} | {Colors.CYAN}Interface: {interface}{Colors.RESET}")
+                        print(f"   {Colors.BRIGHT_YELLOW}⚠️  Estatísticas não disponíveis{Colors.RESET}")
                 else:
-                    print(f"[{current_time}] 🟢 VPN Conectada")
+                    spinner = get_spinner_char(int(time.time() * 5) % 8, 0)
+                    print(f"{Colors.BRIGHT_GREEN}[{current_time}] {spinner} VPN Conectada{Colors.RESET}")
             
             # Aguardar antes da próxima verificação
             time.sleep(check_interval)
@@ -262,15 +353,18 @@ def monitor_and_reconnect():
             # Limpar linha anterior (opcional, para não poluir muito)
             if time.time() - last_check > 30:  # A cada 30 segundos, limpar tela
                 print_header()
-                print("🔄 Modo Auto-Reconexão Ativado")
-                print("=" * 70)
+                print(Colors.BRIGHT_YELLOW + "🔄 Modo Auto-Reconexão Ativado" + Colors.RESET)
+                print(Colors.BRIGHT_CYAN + "=" * 70 + Colors.RESET)
                 print()
                 last_check = time.time()
     
     except KeyboardInterrupt:
         print()
-        print("=" * 70)
-        print("🛑 Encerrando monitoramento...")
+        print(Colors.BRIGHT_CYAN + "=" * 70 + Colors.RESET)
+        print(Colors.BRIGHT_YELLOW + "🛑 Encerrando monitoramento..." + Colors.RESET)
+        
+        # Animação de encerramento
+        animate_spinner("Desconectando", 1, 1)
         
         # Matar processos de conexão
         if connection_process:
@@ -282,28 +376,35 @@ def monitor_and_reconnect():
         except:
             pass
         
-        print("✅ Encerrado")
+        print(Colors.BRIGHT_GREEN + "✅ Encerrado" + Colors.RESET)
         sys.exit(0)
 
 def main():
     """Função principal"""
     print_header()
-    print("🔐 VPN Auto-Reconnect")
+    print(Colors.BOLD + Colors.BRIGHT_GREEN + "🔐 VPN Auto-Reconnect" + Colors.RESET)
     print()
-    print("Este script irá:")
-    print("  • Conectar à VPN automaticamente")
-    print("  • Monitorar a conexão continuamente")
-    print("  • Reconectar automaticamente se desconectar")
+    print(Colors.BRIGHT_BLUE + "Este script irá:" + Colors.RESET)
+    print(Colors.CYAN + "  • Conectar à VPN automaticamente" + Colors.RESET)
+    print(Colors.CYAN + "  • Monitorar a conexão continuamente" + Colors.RESET)
+    print(Colors.CYAN + "  • Reconectar automaticamente se desconectar" + Colors.RESET)
     print()
-    print("=" * 70)
+    print(Colors.BRIGHT_CYAN + "=" * 70 + Colors.RESET)
     print()
     
     try:
-        input("Pressione Enter para iniciar (ou Ctrl+C para sair)...")
+        print(Colors.BRIGHT_YELLOW + "💡 Pressione Enter para iniciar (ou Ctrl+C para sair)..." + Colors.RESET)
+        input()
+        
+        # Animação de inicialização
+        print()
+        animate_spinner("Inicializando sistema", 1.5, 0)
+        print()
+        
         monitor_and_reconnect()
     except KeyboardInterrupt:
         clear_screen()
-        print("👋 Até logo!")
+        print(Colors.BRIGHT_CYAN + "👋 Até logo!" + Colors.RESET)
         sys.exit(0)
 
 if __name__ == "__main__":
