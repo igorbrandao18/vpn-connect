@@ -321,31 +321,85 @@ def monitor_and_reconnect():
                         
                         # Animação de status conectado
                         spinner = get_spinner_char(int(time.time() * 5) % 8, 0)
-                        status_indicator = Colors.BRIGHT_GREEN + "🟢" + Colors.RESET
                         
-                        # Barra de progresso visual para tráfego
-                        def get_traffic_bar(value, max_value=1000000000, width=20):
-                            if max_value == 0:
-                                return "░" * width
-                            filled = min(int((value / max_value) * width), width)
-                            bar = Colors.BRIGHT_GREEN + "█" * filled + Colors.DIM + "░" * (width - filled) + Colors.RESET
-                            return bar
+                        # Obter largura do terminal (padrão 70 se não conseguir)
+                        try:
+                            terminal_width = os.get_terminal_size().columns - 2
+                        except:
+                            terminal_width = 68
                         
-                        # Calcular porcentagem de uso (estimativa)
-                        max_traffic = max(rx_bytes, tx_bytes, 1)
-                        rx_bar = get_traffic_bar(rx_bytes, max_traffic * 1.2, 15)
-                        tx_bar = get_traffic_bar(tx_bytes, max_traffic * 1.2, 15)
+                        # Barra de progresso animada que "percorre"
+                        def get_animated_bar(frame, width):
+                            """Cria uma barra animada que percorre"""
+                            bar_width = width - 20  # Deixar espaço para texto
+                            pos = frame % (bar_width * 2)
+                            
+                            if pos < bar_width:
+                                # Barra crescendo da esquerda
+                                filled = pos
+                                empty = bar_width - pos
+                            else:
+                                # Barra diminuindo pela direita
+                                filled = (bar_width * 2) - pos
+                                empty = bar_width - filled
+                            
+                            # Criar barra com gradiente
+                            bar = ""
+                            for i in range(bar_width):
+                                if i < filled:
+                                    # Gradiente de cores
+                                    if i < filled * 0.3:
+                                        bar += Colors.BRIGHT_GREEN + "█"
+                                    elif i < filled * 0.6:
+                                        bar += Colors.GREEN + "█"
+                                    else:
+                                        bar += Colors.BRIGHT_CYAN + "█"
+                                else:
+                                    bar += Colors.DIM + "░"
+                            
+                            return bar + Colors.RESET
                         
-                        print(f"{Colors.BRIGHT_GREEN}[{current_time}] {spinner} VPN Conectada{Colors.RESET} | {Colors.CYAN}Interface: {interface}{Colors.RESET}")
-                        print(f"   {Colors.BRIGHT_BLUE}⬇️  Entrada:{Colors.RESET} {Colors.BRIGHT_GREEN}{format_bytes(rx_bytes):>12}{Colors.RESET} {rx_bar}")
-                        print(f"   {Colors.BRIGHT_MAGENTA}⬆️  Saída:{Colors.RESET}   {Colors.BRIGHT_GREEN}{format_bytes(tx_bytes):>12}{Colors.RESET} {tx_bar}")
+                        # Frame para animação (baseado no tempo)
+                        animation_frame = int(time.time() * 10) % (terminal_width * 2)
+                        
+                        # Limpar linhas anteriores e escrever na mesma posição
+                        sys.stdout.write('\r' + ' ' * terminal_width + '\r')
+                        sys.stdout.flush()
+                        
+                        # Status e interface
+                        status_line = f"{Colors.BRIGHT_GREEN}[{current_time}] {spinner} VPN Conectada{Colors.RESET} | {Colors.CYAN}{interface}{Colors.RESET}"
+                        sys.stdout.write(status_line + '\n')
+                        sys.stdout.flush()
+                        
+                        # Entrada com barra animada
+                        rx_formatted = format_bytes(rx_bytes)
+                        rx_label = f"{Colors.BRIGHT_BLUE}⬇️  Entrada:{Colors.RESET} {Colors.BRIGHT_GREEN}{rx_formatted:>12}{Colors.RESET} "
+                        rx_bar = get_animated_bar(animation_frame, terminal_width - len(rx_label))
+                        sys.stdout.write(rx_label + rx_bar + '\r')
+                        sys.stdout.flush()
+                        
+                        # Aguardar um pouco para ver a animação
+                        time.sleep(0.1)
+                        
+                        # Saída com barra animada (offset diferente para não sincronizar)
+                        tx_formatted = format_bytes(tx_bytes)
+                        tx_label = f"{Colors.BRIGHT_MAGENTA}⬆️  Saída:{Colors.RESET}   {Colors.BRIGHT_GREEN}{tx_formatted:>12}{Colors.RESET} "
+                        tx_bar = get_animated_bar(animation_frame + terminal_width, terminal_width - len(tx_label))
+                        sys.stdout.write('\r' + ' ' * terminal_width + '\r')
+                        sys.stdout.write(rx_label + rx_bar + '\n')
+                        sys.stdout.write(tx_label + tx_bar + '\r')
+                        sys.stdout.flush()
                     else:
                         spinner = get_spinner_char(int(time.time() * 5) % 8, 0)
-                        print(f"{Colors.BRIGHT_GREEN}[{current_time}] {spinner} VPN Conectada{Colors.RESET} | {Colors.CYAN}Interface: {interface}{Colors.RESET}")
-                        print(f"   {Colors.BRIGHT_YELLOW}⚠️  Estatísticas não disponíveis{Colors.RESET}")
+                        sys.stdout.write('\r' + ' ' * 70 + '\r')
+                        sys.stdout.write(f"{Colors.BRIGHT_GREEN}[{current_time}] {spinner} VPN Conectada{Colors.RESET} | {Colors.CYAN}Interface: {interface}{Colors.RESET}\n")
+                        sys.stdout.write(f"   {Colors.BRIGHT_YELLOW}⚠️  Estatísticas não disponíveis{Colors.RESET}\r")
+                        sys.stdout.flush()
                 else:
                     spinner = get_spinner_char(int(time.time() * 5) % 8, 0)
-                    print(f"{Colors.BRIGHT_GREEN}[{current_time}] {spinner} VPN Conectada{Colors.RESET}")
+                    sys.stdout.write('\r' + ' ' * 70 + '\r')
+                    sys.stdout.write(f"{Colors.BRIGHT_GREEN}[{current_time}] {spinner} VPN Conectada{Colors.RESET}\r")
+                    sys.stdout.flush()
             
             # Aguardar antes da próxima verificação
             time.sleep(check_interval)
