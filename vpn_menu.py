@@ -225,22 +225,19 @@ def get_interface_stats(interface):
                             ipkts = 0
                             opkts = 0
                             
-                            # Formato real: ppp0 1354 <Link#24> 0 0 0 4 0 796 0
-                            #              [0]   [1]  [2]       [3][4][5][6][7][8] [9]
-                            #              Interface MTU Network Address Ipkts Ierrs Opkts Oerrs outro Coll
-                            # Então: Ipkts está em parts[4], Opkts está em parts[6]
-                            ipkts = int(parts[4]) if len(parts) > 4 else 0  # Ipkts (packets recebidos)
-                            opkts = int(parts[6]) if len(parts) > 6 else 0  # Opkts (packets enviados)
+                            # Formato real do netstat -ibn:
+                            # Name Mtu Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll
+                            # ppp0 1354 <Link#24> 3021 0 4008237 1606 0 90405 0
+                            # [0]  [1]  [2]       [3]  [4][5]    [6]  [7][8]   [9]
+                            # Interface MTU Network Address Ipkts Ierrs Ibytes Opkts Oerrs Obytes Coll
+                            # IMPORTANTE: O netstat mostra BYTES diretamente!
+                            # Ibytes (bytes recebidos) está em parts[5]
+                            # Obytes (bytes enviados) está em parts[8]
+                            rx_bytes = int(parts[5]) if len(parts) > 5 else 0  # Ibytes (BYTES recebidos)
+                            tx_bytes = int(parts[8]) if len(parts) > 8 else 0  # Obytes (BYTES enviados)
                             
-                            # Estimar bytes usando MTU da interface (mais preciso)
-                            # Usar 80% do MTU como média (considerando overhead)
-                            avg_packet_size = int(mtu * 0.8)
-                            rx_bytes = ipkts * avg_packet_size
-                            tx_bytes = opkts * avg_packet_size
-                            
-                            # Se pelo menos um tem valor, retornar (mesmo que o outro seja 0)
-                            if ipkts >= 0 and opkts >= 0:
-                                return {'rx': rx_bytes, 'tx': tx_bytes}
+                            # Retornar mesmo se um for 0 (pode ser que realmente não tenha recebido nada ainda)
+                            return {'rx': rx_bytes, 'tx': tx_bytes}
                         except (ValueError, IndexError) as e:
                             continue
         
