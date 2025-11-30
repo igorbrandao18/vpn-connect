@@ -74,6 +74,22 @@ def clear_screen():
     """Limpa a tela"""
     os.system('clear' if os.name != 'nt' else 'cls')
 
+def move_cursor_to_line(line):
+    """Move o cursor para uma linha específica"""
+    sys.stdout.write(f'\033[{line};1H')
+    sys.stdout.flush()
+
+def clear_from_cursor():
+    """Limpa da posição do cursor até o fim da tela"""
+    sys.stdout.write('\033[J')
+    sys.stdout.flush()
+
+def strip_ansi(text):
+    """Remove códigos ANSI de uma string"""
+    import re
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', text)
+
 def print_header():
     """Imprime cabeçalho com animação"""
     clear_screen()
@@ -263,21 +279,40 @@ def connect_vpn_process():
 
 def monitor_and_reconnect():
     """Monitora VPN e reconecta automaticamente"""
-    print_header()
-    print(Colors.BRIGHT_YELLOW + "🔄 Modo Auto-Reconexão Ativado" + Colors.RESET)
-    print()
-    print(Colors.BRIGHT_BLUE + "💡 O sistema irá:" + Colors.RESET)
-    print(Colors.CYAN + "   • Conectar à VPN automaticamente" + Colors.RESET)
-    print(Colors.CYAN + "   • Monitorar a conexão continuamente" + Colors.RESET)
-    print(Colors.CYAN + "   • Reconectar se desconectar" + Colors.RESET)
-    print()
-    print(Colors.BRIGHT_CYAN + "=" * 70 + Colors.RESET)
-    print()
+    clear_screen()
+    
+    # Obter largura do terminal
+    try:
+        terminal_width = os.get_terminal_size().columns - 2
+    except:
+        terminal_width = 68
+    
+    # Criar header fixo (impresso apenas uma vez)
+    print(Colors.BRIGHT_CYAN + "╔" + "═" * (terminal_width - 2) + "╗" + Colors.RESET)
+    print(Colors.BRIGHT_CYAN + "║" + Colors.RESET + f" {Colors.BRIGHT_GREEN}🔐 VPN AUTO-RECONNECT{Colors.RESET}" +
+          " " * (terminal_width - 22) + Colors.BRIGHT_CYAN + "║" + Colors.RESET)
+    print(Colors.BRIGHT_CYAN + "╠" + "═" * (terminal_width - 2) + "╣" + Colors.RESET)
+    
+    # Linha do header com status (será atualizada dinamicamente)
+    header_status_line = 4
+    print(Colors.BRIGHT_CYAN + "║" + Colors.RESET + " " * (terminal_width - 2) + Colors.BRIGHT_CYAN + "║" + Colors.RESET)
+    
+    # Linha de interface/IP (será atualizada dinamicamente)
+    header_info_line = 5
+    print(Colors.BRIGHT_CYAN + "║" + Colors.RESET + " " * (terminal_width - 2) + Colors.BRIGHT_CYAN + "║" + Colors.RESET)
+    
+    print(Colors.BRIGHT_CYAN + "╠" + "─" * (terminal_width - 2) + "╣" + Colors.RESET)
+    
+    # Linha onde começa o conteúdo dinâmico
+    content_start_line = 7
     
     connection_process = None
-    last_check = time.time()
     check_interval = 5  # Verificar a cada 5 segundos
     reconnect_delay = 10  # Aguardar 10 segundos antes de reconectar
+    
+    # Contador de reconexões
+    reconnect_count = 0
+    was_connected = False  # Para detectar quando reconecta
     
     # Contador de linhas para controle de atualização
     lines_written = 0
@@ -295,26 +330,68 @@ def monitor_and_reconnect():
             
             # Se não está conectado e não há processo de conexão
             if not is_connected and connection_process is None:
-                print(Colors.BRIGHT_RED + f"[{current_time}] ⚠️  VPN desconectada" + Colors.RESET)
+                # Incrementar contador de reconexões se estava conectado antes
+                if was_connected:
+                    reconnect_count += 1
+                
+                # Atualizar header com status desconectado
+                spinner = get_spinner_char(int(time.time() * 5) % 8, 0)
+                move_cursor_to_line(header_status_line)
+                status_text = (f" {Colors.BRIGHT_RED}{spinner} VPN Desconectada{Colors.RESET} " + 
+                              f"{Colors.DIM}|{Colors.RESET} {Colors.CYAN}{current_time}{Colors.RESET} " +
+                              f"{Colors.DIM}|{Colors.RESET} {Colors.BRIGHT_MAGENTA}Reconexões: {reconnect_count}{Colors.RESET}")
+                status_text_plain = strip_ansi(status_text)
+                padding = max(0, terminal_width - len(status_text_plain) - 3)
+                print(Colors.BRIGHT_CYAN + "║" + Colors.RESET + status_text + " " * padding + Colors.BRIGHT_CYAN + "║" + Colors.RESET)
+                sys.stdout.flush()
+                
+                # Mostrar mensagem no conteúdo
+                move_cursor_to_line(content_start_line)
+                clear_from_cursor()
+                print(Colors.BRIGHT_RED + f"⚠️  VPN desconectada" + Colors.RESET)
+                if was_connected:
+                    print(Colors.BRIGHT_MAGENTA + f"📊 Reconexão #{reconnect_count}" + Colors.RESET)
+                sys.stdout.flush()
                 
                 # Animação de contagem regressiva
                 for remaining in range(reconnect_delay, 0, -1):
                     spinner = get_spinner_char(int(time.time() * 10) % 8, 1)
-                    sys.stdout.write(f'\r{Colors.BRIGHT_YELLOW}{spinner} Reconectando em {remaining}s...{Colors.RESET}')
+                    move_cursor_to_line(content_start_line + (2 if was_connected else 1))
+                    sys.stdout.write(f'{Colors.BRIGHT_YELLOW}{spinner} Reconectando em {remaining}s...{Colors.RESET}')
                     sys.stdout.flush()
                     time.sleep(1)
-                sys.stdout.write('\r' + ' ' * 50 + '\r')
+                move_cursor_to_line(content_start_line + (2 if was_connected else 1))
+                sys.stdout.write(' ' * 50)
                 sys.stdout.flush()
                 
-                print(Colors.BRIGHT_BLUE + f"[{current_time}] 🔌 Tentando conectar..." + Colors.RESET)
-                animate_spinner("Iniciando conexão", 1, 2)
+                # Atualizar header com status reconectando
+                spinner = get_spinner_char(int(time.time() * 10) % 8, 1)
+                move_cursor_to_line(header_status_line)
+                status_text = (f" {Colors.BRIGHT_YELLOW}{spinner} Reconectando...{Colors.RESET} " + 
+                              f"{Colors.DIM}|{Colors.RESET} {Colors.CYAN}{current_time}{Colors.RESET} " +
+                              f"{Colors.DIM}|{Colors.RESET} {Colors.BRIGHT_MAGENTA}Reconexões: {reconnect_count}{Colors.RESET}")
+                status_text_plain = strip_ansi(status_text)
+                padding = max(0, terminal_width - len(status_text_plain) - 3)
+                print(Colors.BRIGHT_CYAN + "║" + Colors.RESET + status_text + " " * padding + Colors.BRIGHT_CYAN + "║" + Colors.RESET)
+                sys.stdout.flush()
+                
+                # Mostrar no conteúdo
+                move_cursor_to_line(content_start_line)
+                clear_from_cursor()
+                print(Colors.BRIGHT_BLUE + f"🔌 Tentando conectar..." + Colors.RESET)
+                sys.stdout.flush()
                 
                 connection_process = connect_vpn_process()
                 
+                move_cursor_to_line(content_start_line)
+                clear_from_cursor()
                 if connection_process:
-                    print(Colors.BRIGHT_GREEN + f"[{current_time}] ✅ Processo de conexão iniciado (PID: {connection_process.pid})" + Colors.RESET)
+                    print(Colors.BRIGHT_GREEN + f"✅ Processo de conexão iniciado (PID: {connection_process.pid})" + Colors.RESET)
                 else:
-                    print(Colors.BRIGHT_RED + f"[{current_time}] ❌ Erro ao iniciar conexão" + Colors.RESET)
+                    print(Colors.BRIGHT_RED + f"❌ Erro ao iniciar conexão" + Colors.RESET)
+                sys.stdout.flush()
+                
+                was_connected = False
             
             # Se está conectado
             elif is_connected:
@@ -429,7 +506,15 @@ def monitor_and_reconnect():
                             ipkts = 0
                             opkts = 0
                         
+                        # Atualizar status de conexão
+                        if not was_connected:
+                            was_connected = True
+                            # Se não tinha connection_start_time, é a primeira conexão
+                            if not hasattr(monitor_and_reconnect, 'connection_start_time'):
+                                monitor_and_reconnect.connection_start_time = time.time()
+                        
                         # Calcular tempo de conexão
+                        current_time_sec = time.time()
                         uptime_seconds = int(current_time_sec - monitor_and_reconnect.connection_start_time)
                         uptime_hours = uptime_seconds // 3600
                         uptime_minutes = (uptime_seconds % 3600) // 60
@@ -440,6 +525,29 @@ def monitor_and_reconnect():
                         rx_percent = (rx_bytes / total_bytes * 100) if total_bytes > 0 else 0
                         tx_percent = (tx_bytes / total_bytes * 100) if total_bytes > 0 else 0
                         avg_speed = (rx_speed + tx_speed) / 2 if (rx_speed + tx_speed) > 0 else 0
+                        
+                        # Atualizar header fixo (linha 4 - status)
+                        move_cursor_to_line(header_status_line)
+                        status_text = (f" {Colors.BRIGHT_GREEN}{spinner} VPN Status{Colors.RESET} " + 
+                                      f"{Colors.DIM}|{Colors.RESET} {Colors.CYAN}{current_time}{Colors.RESET} " +
+                                      f"{Colors.DIM}|{Colors.RESET} {Colors.BRIGHT_YELLOW}Uptime: {uptime_hours:02d}:{uptime_minutes:02d}:{uptime_secs:02d}{Colors.RESET} " +
+                                      f"{Colors.DIM}|{Colors.RESET} {Colors.BRIGHT_MAGENTA}Reconexões: {reconnect_count}{Colors.RESET}")
+                        status_text_plain = strip_ansi(status_text)
+                        padding = max(0, terminal_width - len(status_text_plain) - 3)
+                        print(Colors.BRIGHT_CYAN + "║" + Colors.RESET + status_text + " " * padding + Colors.BRIGHT_CYAN + "║" + Colors.RESET)
+                        
+                        # Atualizar linha de informações (linha 5)
+                        move_cursor_to_line(header_info_line)
+                        info_text = (f" {Colors.BOLD}Interface:{Colors.RESET} {Colors.CYAN}{interface:<15}{Colors.RESET} " +
+                                    f"{Colors.DIM}│{Colors.RESET} {Colors.BOLD}IP:{Colors.RESET} {Colors.CYAN}{vpn_ip:<15}{Colors.RESET} " +
+                                    f"{Colors.DIM}│{Colors.RESET} {Colors.BOLD}MTU:{Colors.RESET} {Colors.CYAN}{mtu}{Colors.RESET}")
+                        info_text_plain = strip_ansi(info_text)
+                        padding = max(0, terminal_width - len(info_text_plain) - 3)
+                        print(Colors.BRIGHT_CYAN + "║" + Colors.RESET + info_text + " " * padding + Colors.BRIGHT_CYAN + "║" + Colors.RESET)
+                        
+                        # Mover para linha de conteúdo e limpar abaixo
+                        move_cursor_to_line(content_start_line)
+                        clear_from_cursor()
                         
                         # Barra melhorada que combina animação com valor real
                         def get_enhanced_bar(frame, width, value=0, max_value=1000000000):
@@ -479,20 +587,7 @@ def monitor_and_reconnect():
                             
                             return bar + Colors.RESET
                         
-                        # Exibir dashboard completo (criando linhas novas)
-                        print()
-                        print(Colors.BRIGHT_CYAN + "╔" + "═" * (terminal_width - 2) + "╗" + Colors.RESET)
-                        print(Colors.BRIGHT_CYAN + "║" + Colors.RESET + f" {Colors.BRIGHT_GREEN}{spinner} VPN Status{Colors.RESET} " + 
-                              f"{Colors.DIM}|{Colors.RESET} {Colors.CYAN}{current_time}{Colors.RESET} " +
-                              f"{Colors.DIM}|{Colors.RESET} {Colors.BRIGHT_YELLOW}Uptime: {uptime_hours:02d}:{uptime_minutes:02d}:{uptime_secs:02d}{Colors.RESET}" +
-                              " " * (terminal_width - 50) + Colors.BRIGHT_CYAN + "║" + Colors.RESET)
-                        print(Colors.BRIGHT_CYAN + "╠" + "═" * (terminal_width - 2) + "╣" + Colors.RESET)
-                        print(Colors.BRIGHT_CYAN + "║" + Colors.RESET + f" {Colors.BOLD}Interface:{Colors.RESET} {Colors.CYAN}{interface:<15}{Colors.RESET} " +
-                              f"{Colors.DIM}│{Colors.RESET} {Colors.BOLD}IP:{Colors.RESET} {Colors.CYAN}{vpn_ip:<15}{Colors.RESET} " +
-                              f"{Colors.DIM}│{Colors.RESET} {Colors.BOLD}MTU:{Colors.RESET} {Colors.CYAN}{mtu}{Colors.RESET}" +
-                              " " * (terminal_width - 60) + Colors.BRIGHT_CYAN + "║" + Colors.RESET)
-                        print(Colors.BRIGHT_CYAN + "╠" + "─" * (terminal_width - 2) + "╣" + Colors.RESET)
-                        print()
+                        # Exibir dashboard completo (abaixo do header fixo)
                         
                         # Estatísticas de entrada
                         print(f"  {Colors.BRIGHT_BLUE}⬇️  ENTRADA (Download){Colors.RESET}")
@@ -524,29 +619,43 @@ def monitor_and_reconnect():
                               " " * (terminal_width - 45) + Colors.BRIGHT_CYAN + "║" + Colors.RESET)
                         print(Colors.BRIGHT_CYAN + "╚" + "═" * (terminal_width - 2) + "╝" + Colors.RESET)
                         
-                        lines_written = 0  # Deixar criar linhas novas
+                        sys.stdout.flush()
                     else:
+                        # Atualizar header
                         spinner = get_spinner_char(int(time.time() * 5) % 8, 0)
-                        sys.stdout.write('\r' + ' ' * 70 + '\r')
-                        sys.stdout.write(f"{Colors.BRIGHT_GREEN}[{current_time}] {spinner} VPN Conectada{Colors.RESET} | {Colors.CYAN}Interface: {interface}{Colors.RESET}\n")
-                        sys.stdout.write(f"   {Colors.BRIGHT_YELLOW}⚠️  Estatísticas não disponíveis{Colors.RESET}\r")
+                        move_cursor_to_line(header_status_line)
+                        status_text = (f" {Colors.BRIGHT_GREEN}{spinner} VPN Conectada{Colors.RESET} " + 
+                                      f"{Colors.DIM}|{Colors.RESET} {Colors.CYAN}{current_time}{Colors.RESET} " +
+                                      f"{Colors.DIM}|{Colors.RESET} {Colors.BRIGHT_MAGENTA}Reconexões: {reconnect_count}{Colors.RESET}")
+                        status_text_plain = strip_ansi(status_text)
+                        padding = max(0, terminal_width - len(status_text_plain) - 3)
+                        print(Colors.BRIGHT_CYAN + "║" + Colors.RESET + status_text + " " * padding + Colors.BRIGHT_CYAN + "║" + Colors.RESET)
+                        
+                        # Mostrar mensagem no conteúdo
+                        move_cursor_to_line(content_start_line)
+                        clear_from_cursor()
+                        print(f"{Colors.BRIGHT_GREEN}✅ VPN Conectada{Colors.RESET} | {Colors.CYAN}Interface: {interface}{Colors.RESET}")
+                        print(f"{Colors.BRIGHT_YELLOW}⚠️  Estatísticas não disponíveis{Colors.RESET}")
                         sys.stdout.flush()
                 else:
+                    # Atualizar header
                     spinner = get_spinner_char(int(time.time() * 5) % 8, 0)
-                    sys.stdout.write('\r' + ' ' * 70 + '\r')
-                    sys.stdout.write(f"{Colors.BRIGHT_GREEN}[{current_time}] {spinner} VPN Conectada{Colors.RESET}\r")
+                    move_cursor_to_line(header_status_line)
+                    status_text = (f" {Colors.BRIGHT_GREEN}{spinner} VPN Conectada{Colors.RESET} " + 
+                                  f"{Colors.DIM}|{Colors.RESET} {Colors.CYAN}{current_time}{Colors.RESET} " +
+                                  f"{Colors.DIM}|{Colors.RESET} {Colors.BRIGHT_MAGENTA}Reconexões: {reconnect_count}{Colors.RESET}")
+                    status_text_plain = strip_ansi(status_text)
+                    padding = max(0, terminal_width - len(status_text_plain) - 3)
+                    print(Colors.BRIGHT_CYAN + "║" + Colors.RESET + status_text + " " * padding + Colors.BRIGHT_CYAN + "║" + Colors.RESET)
+                    
+                    # Mostrar mensagem no conteúdo
+                    move_cursor_to_line(content_start_line)
+                    clear_from_cursor()
+                    print(f"{Colors.BRIGHT_GREEN}✅ VPN Conectada{Colors.RESET}")
                     sys.stdout.flush()
             
             # Aguardar antes da próxima verificação
             time.sleep(check_interval)
-            
-            # Limpar linha anterior (opcional, para não poluir muito)
-            if time.time() - last_check > 30:  # A cada 30 segundos, limpar tela
-                print_header()
-                print(Colors.BRIGHT_YELLOW + "🔄 Modo Auto-Reconexão Ativado" + Colors.RESET)
-                print(Colors.BRIGHT_CYAN + "=" * 70 + Colors.RESET)
-                print()
-                last_check = time.time()
     
     except KeyboardInterrupt:
         print()
