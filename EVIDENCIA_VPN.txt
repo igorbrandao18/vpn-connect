@@ -1,0 +1,56 @@
+🔐 Solução para VPN Sonepar - Auto-Reconexão
+
+📋 Problema Identificado
+
+A VPN da Sonepar (dtc.sonepar.com.br) estava apresentando quedas intermitentes durante o uso, causando interrupções no trabalho e necessidade de reconexão manual frequente.
+
+✅ Solução Implementada
+
+Foi criado um script Python que monitora a conexão VPN e reconecta automaticamente quando detecta desconexão.
+
+Funcionalidades:
+
+- 🔄 Monitoramento contínuo: Verifica o status da VPN a cada 5 segundos
+- 🔁 Auto-reconexão: Reconecta automaticamente quando detecta queda
+- 📊 Monitoramento de tráfego: Mostra estatísticas de entrada/saída em tempo real
+- 🔐 Autenticação Azure AD: Integra com Azure CLI para autenticação SAML
+- 🟢 Status visual: Indica claramente quando está conectada/desconectada
+
+Como funciona:
+
+1. O script verifica continuamente se a VPN está conectada
+2. Se detectar desconexão, aguarda 10 segundos e tenta reconectar
+3. Durante a conexão, abre o navegador automaticamente para autenticação SAML
+4. Mantém a conexão ativa e monitora o status
+5. Exibe estatísticas de tráfego em tempo real
+
+Tecnologias utilizadas:
+
+- Python 3 - Linguagem do script
+- openfortivpn - Cliente VPN open-source para FortiClient SSL VPN
+- Azure CLI - Para autenticação Azure AD
+- macOS nativo - Integração com sistema operacional
+
+Arquivos criados:
+
+- vpn_menu.py - Script principal de auto-reconexão
+- connect_vpn.py - Script de conexão à VPN
+- monitor_vpn.py - Painel de monitoramento de tráfego
+
+Exemplo de uso:
+
+python3 vpn_menu.py
+
+O script inicia automaticamente e fica monitorando. Quando detecta queda, reconecta sozinho.
+
+Evidência de funcionamento:
+
+- ✅ Detecta desconexões automaticamente
+- ✅ Reconecta sem intervenção manual
+- ✅ Mantém conexão estável
+- ✅ Mostra estatísticas de tráfego em tempo real
+
+---
+
+Observação: Esta solução foi criada para mitigar as quedas intermitentes da VPN enquanto o problema de infraestrutura é investigado pelo time de TI.
+
