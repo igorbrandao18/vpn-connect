@@ -21,20 +21,45 @@ az login
 
 ## Uso
 
+### Conectar à VPN
+
 ```bash
 python3 connect_vpn.py --gateway dtc.sonepar.com.br
 ```
 
 **Importante:** O script precisa ficar rodando para manter a VPN conectada. Após conectar, o script continuará monitorando a conexão. Para desconectar, pressione `Ctrl+C`.
 
+### Monitorar Tráfego VPN
+
+Em outro terminal, execute o painel de monitoramento:
+
+```bash
+python3 monitor_vpn.py
+```
+
+O painel mostra em tempo real:
+- ⬇️ Tráfego de entrada (download)
+- ⬆️ Tráfego de saída (upload)
+- 📊 Velocidade de transferência
+- 📈 Estatísticas totais
+- 🟢 Status da conexão
+
 ## Funcionalidades
 
+### Script de Conexão (`connect_vpn.py`)
 - ✅ Verifica autenticação Azure CLI automaticamente
 - ✅ Obtém token do Azure CLI
 - ✅ Abre navegador automaticamente para autenticação SAML
 - ✅ Conecta à VPN usando openfortivpn
 - ✅ Mantém conexão ativa e monitora status
 - ✅ Desconecta automaticamente ao pressionar Ctrl+C
+
+### Painel de Monitoramento (`monitor_vpn.py`)
+- 📊 Monitora tráfego de entrada e saída em tempo real
+- 📈 Mostra velocidade de transferência
+- 📉 Gráficos visuais de uso
+- 🟢 Status da conexão VPN
+- 💾 Estatísticas totais de transferência
 
 ## Opções
 
